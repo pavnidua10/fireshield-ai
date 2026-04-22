@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ForestGuard | FireShield AI Ecosystem</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    <style>
+        /* ── Risk Gauge ── */
+        .gauge-wrap { text-align: center; padding: 10px 0 0; }
+        .gauge-wrap svg { overflow: visible; }
+        #gauge-arc {
+            transition: stroke-dashoffset 1s cubic-bezier(.4,0,.2,1), stroke 0.5s ease;
+        }
+
+        /* ── Feature Cards ── */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        .feat-card {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 10px;
+            padding: 12px 14px;
+            transition: border-color 0.2s;
+        }
+        .feat-card:hover { border-color: rgba(255,255,255,0.15); }
+        .feat-category {
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .feat-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 2px;
+        }
+        .feat-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+        .cat-weather  { color: #378ADD; border-top: 2px solid #378ADD; }
+        .cat-terrain  { color: #2ea043; border-top: 2px solid #2ea043; }
+        .cat-computed { color: #d29922; border-top: 2px solid #d29922; }
+
+        /* ── Risk Badge ── */
+        .risk-badge {
+            display: inline-block;
+            padding: 5px 18px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .risk-low    { background: rgba(46,160,67,0.15);  color: #2ea043; }
+        .risk-medium { background: rgba(210,153,34,0.15); color: #d29922; }
+        .risk-high   { background: rgba(248,81,73,0.15);  color: #f85149; }
+
+        /* ── Recommendation dots ── */
+        .rec-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 7px 0;
+            font-size: 13px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            line-height: 1.4;
+        }
+        .rec-item:last-child { border-bottom: none; }
+        .rec-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            margin-top: 4px;
+        }
+
+        /* ── AI Explanation Box ── */
+        .explain-box {
+            background: rgba(255,255,255,0.04);
+            border-left: 3px solid #378ADD;
+            border-radius: 0 8px 8px 0;
+            padding: 10px 14px;
+            margin-bottom: 16px;
+        }
+        .explain-box .label {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            color: #378ADD;
+            margin-bottom: 5px;
+        }
+        .explain-box p {
+            font-size: 12.5px;
+            color: var(--text-main);
+            line-height: 1.55;
+            margin: 0;
+        }
+
+        /* ── Empty State ── */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 48px 20px;
+            text-align: center;
+        }
+        .empty-fire-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: rgba(248,81,73,0.12);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+            font-size: 22px;
+            color: #f85149;
+        }
+
+        /* ── Confidence bar ── */
+        .conf-bar-wrap { margin: 10px 0 16px; }
+        .conf-bar-bg {
+            height: 5px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .conf-bar-fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 1s cubic-bezier(.4,0,.2,1);
+        }
+        .conf-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        /* ── Section divider ── */
+        .section-divider {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            padding: 8px 0 6px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            margin-bottom: 12px;
+        }
+
+        /* ── Scan button pulse ── */
+        .scanning .fa-satellite-dish { animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Live badge in header ── */
+        .live-dot {
+            display: inline-block;
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: #2ea043;
+            margin-right: 5px;
+            animation: pulse 1.4s infinite;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar -->
+    <nav id="sidebar">
+        <div class="sidebar-header">
+            <i class="fa-solid fa-fire-flame-curved"></i>
+            <h4 class="mb-0 fw-bold">ForestGuard</h4>
+        </div>
+        <ul class="sidebar-menu">
+            <li><a href="#" class="active"><i class="fa-solid fa-house"></i> Dashboard</a></li>
+            <li><a href="#prediction-section"><i class="fa-solid fa-brain"></i> AI Predictor</a></li>
+            <li><a href="#map-section"><i class="fa-solid fa-map-location-dot"></i> Risk Map</a></li>
+            <li><a href="#analytics-section"><i class="fa-solid fa-chart-line"></i> Analytics</a></li>
+            <li><a href="#"><i class="fa-solid fa-bell"></i> Alerts</a></li>
+        </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <div id="content">
+
+        <!-- Hero -->
+        <header class="hero-section">
+            <div>
+                <h1 class="fw-bold">FireShield AI</h1>
+                <p class="text-muted mb-0">11-Feature Autonomous Intelligence Engine</p>
+            </div>
+            <div class="hero-stats">
+                <div class="stat-box mt-2 flex-column align-items-start" style="min-width: 210px;">
+                    <div class="d-flex w-100 justify-content-between align-items-center pb-2 mb-2 border-bottom border-secondary">
+                        <div class="text-muted small">
+                            <span class="live-dot"></span>
+                            <span id="weather-location">Awaiting Scan...</span>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-3 w-100">
+                        <i id="weather-icon" class="fa-solid fa-globe fa-2x mb-0 text-primary"></i>
+                        <div>
+                            <div class="fw-bold h5 mb-0" id="weather-temp">--°C</div>
+                            <small id="weather-desc" class="text-muted">Satellite Pipeline</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="row">
+            <!-- Left Column -->
+            <div class="col-lg-8">
+
+                <!-- Scanner -->
+                <section id="prediction-section" class="glass-card mb-4">
+                    <h5 class="fw-bold mb-1"><i class="fa-solid fa-satellite-dish"></i> Advanced Location Scanner</h5>
+                    <p class="text-muted small mb-3">Powered by Open-Meteo &amp; OpenStreetMap Overpass</p>
+                    <div class="row g-2">
+                        <div class="col-md-9">
+                            <input type="text" class="form-control form-control-lg bg-dark text-white border-secondary"
+                                id="location-input"
+                                placeholder="e.g. Yosemite, Amazon, or Lat/Lon">
+                        </div>
+                        <div class="col-md-3 d-flex gap-2">
+                            <button class="btn btn-primary w-100 fw-bold" id="btn-scan">
+                                <i class="fa-solid fa-satellite-dish"></i> Scan
+                            </button>
+                            <button class="btn btn-outline-secondary" id="btn-geolocate" title="Use My Location">
+                                <i class="fa-solid fa-crosshairs"></i>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Map -->
+                <section id="map-section" class="glass-card mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="fw-bold mb-0"><i class="fa-solid fa-layer-group"></i> Dynamic GIS Layer Map</h5>
+                        <button class="btn btn-sm btn-outline-info" id="toggle-layer">Satellite View</button>
+                    </div>
+                    <div id="map"></div>
+                </section>
+
+                <!-- 11 Feature Cards — colour-coded -->
+                <section class="glass-card">
+                    <h5 class="fw-bold mb-3"><i class="fa-solid fa-microchip"></i> Live Intelligence Variables</h5>
+
+                    <p class="section-divider">Weather</p>
+                    <div class="feature-grid mb-3">
+                        <div class="feat-card cat-weather">
+                            <div class="feat-category cat-weather">Weather</div>
+                            <div class="feat-label">Temperature</div>
+                            <div class="feat-value"><span id="env-temp">--</span></div>
+                        </div>
+                        <div class="feat-card cat-weather">
+                            <div class="feat-category cat-weather">Weather</div>
+                            <div class="feat-label">Humidity</div>
+                            <div class="feat-value"><span id="env-humid">--</span></div>
+                        </div>
+                        <div class="feat-card cat-weather">
+                            <div class="feat-category cat-weather">Weather</div>
+                            <div class="feat-label">Wind Speed</div>
+                            <div class="feat-value"><span id="env-wind">--</span></div>
+                        </div>
+                        <div class="feat-card cat-weather">
+                            <div class="feat-category cat-weather">Weather</div>
+                            <div class="feat-label">7-Day Rainfall</div>
+                            <div class="feat-value"><span id="env-rain">--</span></div>
+                        </div>
+                    </div>
+
+                    <p class="section-divider">Terrain</p>
+                    <div class="feature-grid mb-3">
+                        <div class="feat-card cat-terrain">
+                            <div class="feat-category cat-terrain">Terrain</div>
+                            <div class="feat-label">Forest Cover</div>
+                            <div class="feat-value"><span id="env-forest">--</span></div>
+                        </div>
+                        <div class="feat-card cat-terrain">
+                            <div class="feat-category cat-terrain">Terrain</div>
+                            <div class="feat-label">Elevation</div>
+                            <div class="feat-value"><span id="env-elevation">--</span>m</div>
+                        </div>
+                        <div class="feat-card cat-terrain">
+                            <div class="feat-category cat-terrain">Terrain</div>
+                            <div class="feat-label">Soil Moisture</div>
+                            <div class="feat-value"><span id="env-soil">--</span></div>
+                        </div>
+                        <div class="feat-card cat-terrain">
+                            <div class="feat-category cat-terrain">Terrain</div>
+                            <div class="feat-label">Road Distance</div>
+                            <div class="feat-value"><span id="env-roads">--</span>m</div>
+                        </div>
+                    </div>
+
+                    <p class="section-divider">Computed</p>
+                    <div class="feature-grid">
+                        <div class="feat-card cat-computed">
+                            <div class="feat-category cat-computed">Computed</div>
+                            <div class="feat-label">NDVI Estimate</div>
+                            <div class="feat-value"><span id="env-ndvi">--</span></div>
+                        </div>
+                        <div class="feat-card cat-computed">
+                            <div class="feat-category cat-computed">Computed</div>
+                            <div class="feat-label">Leaf Litter Index</div>
+                            <div class="feat-value"><span id="env-litter">--</span></div>
+                        </div>
+                        <div class="feat-card cat-computed">
+                            <div class="feat-category cat-computed">Computed</div>
+                            <div class="feat-label">Fire History</div>
+                            <div class="feat-value"><span id="env-history">--</span></div>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- Right Column -->
+            <div class="col-lg-4">
+
+                <!-- Result Card -->
+                <section class="glass-card" id="results-card" style="display:none;">
+                    <h5 class="fw-bold mb-3"><i class="fa-solid fa-file-shield"></i> Advanced AI Report</h5>
+
+                    <!-- Gauge -->
+                    <div class="gauge-wrap">
+                        <svg width="200" height="115" viewBox="0 0 200 115">
+                            <!-- Track -->
+                            <path d="M20,100 A80,80 0 0,1 180,100"
+                                fill="none" stroke="rgba(255,255,255,0.07)"
+                                stroke-width="14" stroke-linecap="round"/>
+                            <!-- Fill arc -->
+                            <path id="gauge-arc"
+                                d="M20,100 A80,80 0 0,1 180,100"
+                                fill="none" stroke="#2ea043"
+                                stroke-width="14" stroke-linecap="round"
+                                stroke-dasharray="251.2" stroke-dashoffset="251.2"/>
+                            <!-- Labels -->
+                            <text x="16"  y="116" font-size="10" fill="rgba(255,255,255,0.4)" text-anchor="middle">Low</text>
+                            <text x="100" y="60"  font-size="10" fill="rgba(255,255,255,0.4)" text-anchor="middle">Med</text>
+                            <text x="184" y="116" font-size="10" fill="rgba(255,255,255,0.4)" text-anchor="end">High</text>
+                            <!-- Risk text -->
+                            <text id="gauge-label" x="100" y="90"
+                                font-size="20" font-weight="700"
+                                fill="#ffffff" text-anchor="middle">---</text>
+                        </svg>
+                    </div>
+
+                    <!-- Confidence bar -->
+                    <div class="conf-bar-wrap">
+                        <div class="conf-label">
+                            <span>Confidence</span>
+                            <span id="confidence-score">0%</span>
+                        </div>
+                        <div class="conf-bar-bg">
+                            <div class="conf-bar-fill" id="conf-bar" style="width:0%; background:#2ea043;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Risk badge -->
+                    <div class="text-center mb-3">
+                        <span id="risk-badge" class="risk-badge risk-low">---</span>
+                    </div>
+
+                    <!-- Explanation -->
+                    <div class="explain-box" id="explain-box">
+                        <div class="label"><i class="fa-solid fa-brain"></i> AI Explanation</div>
+                        <p id="ai-explanation">Waiting for analysis...</p>
+                    </div>
+
+                    <!-- Recommendations -->
+                    <div class="section-divider">Response Actions</div>
+                    <div id="recommendation-list"></div>
+
+                    <div class="mt-3">
+                        <button class="btn btn-outline-secondary w-100 btn-sm" onclick="window.print()">
+                            <i class="fa-solid fa-file-pdf"></i> Download Report
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Empty State -->
+                <section class="glass-card" id="empty-state">
+                    <div class="empty-state">
+                        <div class="empty-fire-icon">
+                            <i class="fa-solid fa-fire-flame-curved"></i>
+                        </div>
+                        <p class="fw-bold mb-1">No location scanned</p>
+                        <p class="text-muted small" style="line-height:1.6;">
+                            Enter a city name or drop a pin on the map
+                            to run the 11-feature XGBoost fire risk analysis.
+                        </p>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+
+        <!-- Analytics -->
+        <div class="row mt-4 justify-content-center" id="analytics-section">
+            <div class="col-lg-8 col-md-10 mb-4">
+                <div class="glass-card">
+                    <h5 class="fw-bold mb-3">Wind Spread Estimation</h5>
+                    <div class="d-flex justify-content-around mt-4 pt-2">
+                        <div class="text-center">
+                            <div class="h2 text-info mb-0"><i class="fa-solid fa-wind"></i></div>
+                            <h4 class="fw-bold mt-2 text-info" id="est-wind">--</h4>
+                            <div class="text-muted small">Live Sustained Wind</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="h2 text-danger mb-0"><i class="fa-solid fa-tree"></i></div>
+                            <h4 class="fw-bold mt-2" id="est-trees">--</h4>
+                            <div class="text-muted small">Trees at Risk</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="h2 text-warning mb-0"><i class="fa-solid fa-house-chimney"></i></div>
+                            <h4 class="fw-bold mt-2" id="est-village">--</h4>
+                            <div class="text-muted small">Distance to Village</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row justify-content-center">
+            <div class="col-lg-8 col-md-10 mb-4">
+                <div class="glass-card">
+                    <h5 class="fw-bold mb-3">AI Risk Analytics</h5>
+                    <canvas id="riskChart" height="120"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="row justify-content-center">
+            <div class="col-lg-8 col-md-10 mb-4">
+                <div class="glass-card">
+                    <h5 class="fw-bold mb-3">AI Assistant</h5>
+                    <div id="chatbox" style="max-height:220px;overflow:auto" class="mb-2 small"></div>
+                    <div class="input-group">
+                        <input id="chatInput" class="form-control" placeholder="Ask a fire safety question...">
+                        <button class="btn btn-primary" id="chatSend">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row justify-content-center">
+            <div class="col-lg-8 col-md-10 mb-4">
+                <div class="glass-card">
+                    <h5 class="fw-bold mb-3">Live Wildfire News</h5>
+                    <ul id="newsFeed" class="small mb-0"><li>Loading latest updates...</li></ul>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /content -->
+
+    <!-- Emergency Alert -->
+    <div class="alert-popup alert-danger-custom" id="emergency-alert">
+        <h5 class="fw-bold mb-1"><i class="fa-solid fa-triangle-exclamation"></i> CRITICAL WARNING</h5>
+        <p class="mb-0 small">High risk of forest fire detected. Emergency protocols initiated.</p>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+    // ── Gauge helpers ──────────────────────────────────────────────
+    const GAUGE_TOTAL = 251.2; // arc length of the semicircle
+
+    function setGauge(riskColor, riskLabel, fillFraction) {
+        const arc = document.getElementById('gauge-arc');
+        const lbl = document.getElementById('gauge-label');
+        const offset = GAUGE_TOTAL - (GAUGE_TOTAL * fillFraction);
+        arc.style.stroke = riskColor;
+        arc.style.strokeDashoffset = offset;
+        lbl.textContent = riskLabel;
+        lbl.setAttribute('fill', riskColor);
+    }
+
+    function setConfidence(pct, color) {
+        document.getElementById('confidence-score').textContent = pct + '%';
+        const bar = document.getElementById('conf-bar');
+        bar.style.width = pct + '%';
+        bar.style.background = color;
+    }
+
+    function setRiskBadge(riskLevel, color) {
+        const badge = document.getElementById('risk-badge');
+        badge.textContent = riskLevel;
+        badge.className = 'risk-badge';
+        if (color === 'green')  badge.classList.add('risk-low');
+        if (color === 'yellow') badge.classList.add('risk-medium');
+        if (color === 'red')    badge.classList.add('risk-high');
+    }
+
+    function setExplanationBorder(color) {
+        const colorMap = { green: '#2ea043', yellow: '#d29922', red: '#f85149' };
+        document.getElementById('explain-box').style.borderLeftColor = colorMap[color] || '#378ADD';
+    }
+
+    function renderRecommendations(recs, color) {
+        const colorMap = { green: '#2ea043', yellow: '#d29922', red: '#f85149' };
+        const dotColor = colorMap[color] || '#8b949e';
+        const container = document.getElementById('recommendation-list');
+        container.innerHTML = recs.map(r => `
+            <div class="rec-item">
+                <div class="rec-dot" style="background:${dotColor};"></div>
+                <span>${r}</span>
+            </div>`).join('');
+    }
+
+    // ── Update UI after API response ───────────────────────────────
+    function updateUI(result) {
+        const d = result.data;
+        const color = result.color;
+        const colorMap = { green: '#2ea043', yellow: '#d29922', red: '#f85149' };
+        const fillMap  = { green: 0.2,       yellow: 0.55,      red: 0.92 };
+        const hexColor = colorMap[color];
+
+        // Header
+        document.getElementById('weather-location').textContent = d.location;
+        document.getElementById('weather-temp').textContent = d.temperature + '°C';
+        document.getElementById('weather-desc').textContent = result.risk_level;
+        document.getElementById('weather-icon').style.color = hexColor;
+
+        // Feature cards
+        document.getElementById('env-temp').textContent     = d.temperature + '°C';
+        document.getElementById('env-humid').textContent    = d.humidity + '%';
+        document.getElementById('env-wind').textContent     = d.wind_speed + ' km/h';
+        document.getElementById('env-rain').textContent     = d.rain_7d + ' mm';
+        document.getElementById('env-forest').textContent   = d.forest_density + '%';
+        document.getElementById('env-elevation').textContent = d.elevation;
+        document.getElementById('env-soil').textContent     = d.soil_moisture + '%';
+        document.getElementById('env-roads').textContent    = d.road_distance;
+        document.getElementById('env-ndvi').textContent     = d.ndvi;
+        document.getElementById('env-litter').textContent   = d.leaf_litter;
+        document.getElementById('env-history').textContent  = d.fire_history + ' / 10';
+
+        // Gauge + confidence + badge
+        setGauge(hexColor, result.risk_level.split(' ')[0].toUpperCase(), fillMap[color]);
+        setConfidence(result.confidence, hexColor);
+        setRiskBadge(result.risk_level, color);
+        setExplanationBorder(color);
+
+        // Explanation
+        document.getElementById('ai-explanation').textContent = result.explanation;
+
+        // Recommendations
+        renderRecommendations(result.recommendations, color);
+
+        // Analytics
+        document.getElementById('est-wind').textContent    = d.wind_speed + ' km/h';
+        document.getElementById('est-trees').textContent   = Math.round(d.forest_density * 80) + ' est.';
+        document.getElementById('est-village').textContent = d.village_distance + 'm';
+
+        // Show result card, hide empty state
+        document.getElementById('results-card').style.display = 'block';
+        document.getElementById('empty-state').style.display  = 'none';
+
+        // Emergency alert
+        if (color === 'red') {
+            const alert = document.getElementById('emergency-alert');
+            alert.style.display = 'block';
+            setTimeout(() => alert.style.display = 'none', 6000);
+        }
+
+        // Update chart
+        updateChart(d.temperature, d.humidity, d.wind_speed, d.forest_density, d.soil_moisture);
+    }
+
+    // ── Chart ──────────────────────────────────────────────────────
+    let riskChart;
+    function updateChart(temp, humid, wind, forest, soil) {
+        const ctx = document.getElementById('riskChart').getContext('2d');
+        if (riskChart) riskChart.destroy();
+        riskChart = new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: ['Temperature', 'Dryness', 'Wind', 'Forest Cover', 'Soil Moisture'],
+                datasets: [{
+                    label: 'Risk Factors',
+                    data: [
+                        Math.min(temp / 50 * 100, 100),
+                        100 - humid,
+                        Math.min(wind / 80 * 100, 100),
+                        forest,
+                        soil
+                    ],
+                    backgroundColor: 'rgba(255,71,87,0.15)',
+                    borderColor: '#ff4757',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#ff4757',
+                    pointRadius: 4
+                }]
+            },
+            options: {
+                scales: {
+                    r: {
+                        min: 0, max: 100,
+                        ticks: { color: '#8b949e', backdropColor: 'transparent', stepSize: 25 },
+                        grid: { color: 'rgba(255,255,255,0.07)' },
+                        pointLabels: { color: '#f0f6fc', font: { size: 11 } }
+                    }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
+    // ── Map ────────────────────────────────────────────────────────
+    const map = L.map('map').setView([20, 0], 2);
+    let tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+    }).addTo(map);
+    let marker;
+    let satellite = false;
+
+    document.getElementById('toggle-layer').addEventListener('click', function () {
+        map.removeLayer(tileLayer);
+        satellite = !satellite;
+        const url = satellite
+            ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+            : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+        tileLayer = L.tileLayer(url, { attribution: satellite ? '© Esri' : '© OpenStreetMap' }).addTo(map);
+        this.textContent = satellite ? 'Street View' : 'Satellite View';
+    });
+
+    map.on('click', function (e) {
+        placeMarker(e.latlng.lat, e.latlng.lng);
+        runAnalysis(null, e.latlng.lat, e.latlng.lng);
+    });
+
+    function placeMarker(lat, lon) {
+        if (marker) map.removeLayer(marker);
+        marker = L.marker([lat, lon]).addTo(map);
+        map.setView([lat, lon], 10);
+    }
+
+    // ── Scan ───────────────────────────────────────────────────────
+    function runAnalysis(city, lat, lon) {
+        const btn = document.getElementById('btn-scan');
+        btn.classList.add('scanning');
+        btn.disabled = true;
+
+        const payload = city ? { city } : { lat, lon };
+
+        fetch('/api/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) { alert('Error: ' + data.error); return; }
+            updateUI(data);
+            if (data.data.lat && data.data.lon) placeMarker(data.data.lat, data.data.lon);
+        })
+        .catch(err => alert('Request failed: ' + err))
+        .finally(() => {
+            btn.classList.remove('scanning');
+            btn.disabled = false;
+        });
+    }
+
+    document.getElementById('btn-scan').addEventListener('click', () => {
+        const city = document.getElementById('location-input').value.trim();
+        if (!city) return;
+        runAnalysis(city, null, null);
+    });
+
+    document.getElementById('location-input').addEventListener('keydown', e => {
+        if (e.key === 'Enter') document.getElementById('btn-scan').click();
+    });
+
+    document.getElementById('btn-geolocate').addEventListener('click', () => {
+        if (!navigator.geolocation) return alert('Geolocation not supported.');
+        navigator.geolocation.getCurrentPosition(pos => {
+            runAnalysis(null, pos.coords.latitude, pos.coords.longitude);
+        });
+    });
+
+    // ── AI Chat ────────────────────────────────────────────────────
+    document.getElementById('chatSend').addEventListener('click', () => {
+        const input = document.getElementById('chatInput');
+        const q = input.value.trim();
+        if (!q) return;
+        const box = document.getElementById('chatbox');
+        box.innerHTML += `<div><b style="color:#ff4757">You:</b> ${q}</div>`;
+        input.value = '';
+        box.innerHTML += `<div><b style="color:#8b949e">AI:</b> <em>Thinking...</em></div>`;
+        setTimeout(() => {
+            const divs = box.querySelectorAll('div');
+            divs[divs.length - 1].innerHTML = `<b style="color:#8b949e">AI:</b> Based on fire safety principles: always maintain a defensible space, monitor wind direction, and follow local emergency protocols.`;
+            box.scrollTop = box.scrollHeight;
+        }, 1200);
+    });
+
+    // ── News ───────────────────────────────────────────────────────
+    const newsItems = [
+        'California issues red flag warning for Northern Sierra region.',
+        'Australia expands aerial fire suppression fleet ahead of summer.',
+        'EU Copernicus satellite system tracks 3 new fire hotspots in Iberia.',
+        'Canadian wildfire season declared worst on record for BC province.',
+    ];
+    document.getElementById('newsFeed').innerHTML = newsItems.map(n => `<li class="mb-1">${n}</li>`).join('');
+    </script>
+
+</body>
+</html>
