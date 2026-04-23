@@ -22,6 +22,7 @@
         html, body {
             width: 100%; height: 100%;
             overflow: hidden;
+            overflow-y: auto; 
             font-family: 'Outfit', sans-serif;
             color: #fff;
             background: #0a0a0f;
@@ -71,7 +72,8 @@
         .stage {
             position: relative;
             z-index: 10;
-            height: 100vh;
+            height: calc(100vh - 70px); 
+            margin-top: 70px;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -347,7 +349,9 @@
             <i class="fa-solid fa-fire-flame-curved"></i>
             FireShield AI
         </div>
-    
+        <div class="topbar-right">
+            Powered by <span>&nbsp;Razors</span>
+        </div>
     </nav>
 
     <!-- Main stage -->
@@ -400,7 +404,7 @@
                     Launch Platform
                     <i class="fa-solid fa-arrow-right arrow"></i>
                 </a>
-               
+              
             </div>
 
         </div>
