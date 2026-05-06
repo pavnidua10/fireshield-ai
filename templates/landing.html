@@ -4,11 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FireShield AI | Forest Fire Intelligence</title>
-
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
     <style>
         :root {
             --pink:   #ff2a5f;
@@ -19,16 +17,16 @@
 
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
+        /* FIX 1: Removed overflow:hidden — was blocking all scrolling */
         html, body {
-            width: 100%; height: 100%;
-            overflow: hidden;
-            overflow-y: auto; 
+            width: 100%;
+            min-height: 100vh;
+            overflow-y: auto;
             font-family: 'Outfit', sans-serif;
             color: #fff;
             background: #0a0a0f;
         }
 
-        /* ── Animated background ── */
         .bg {
             position: fixed;
             inset: 0;
@@ -39,7 +37,6 @@
                         #0a0a0f;
         }
 
-        /* Subtle grid overlay */
         .bg::after {
             content: '';
             position: absolute;
@@ -50,7 +47,6 @@
             background-size: 60px 60px;
         }
 
-        /* Floating orbs */
         .orb {
             position: fixed;
             border-radius: 50%;
@@ -68,23 +64,22 @@
             100% { transform: translate(-20px, 20px) scale(0.94); }
         }
 
-        /* ── Layout ── */
+        /* FIX 2: Changed from fixed height to padding so content never clips */
         .stage {
             position: relative;
             z-index: 10;
-            height: calc(100vh - 70px); 
-            margin-top: 70px;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 24px 20px;
+            padding: 48px 20px 60px;
+            min-height: calc(100vh - 70px);
         }
 
-        /* ── Top nav bar ── */
+        /* FIX 3: Changed position:fixed to position:sticky so page scrolls under it properly */
         .topbar {
-            position: fixed;
-            top: 0; left: 0; right: 0;
+            position: sticky;
+            top: 0;
             z-index: 50;
             display: flex;
             justify-content: space-between;
@@ -103,18 +98,7 @@
             letter-spacing: 0.5px;
         }
         .topbar-brand i { color: var(--pink); font-size: 1.1rem; }
-        .topbar-right {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 0.8rem;
-            color: rgba(255,255,255,0.4);
-            letter-spacing: 2px;
-            text-transform: uppercase;
-        }
-        .topbar-right span { color: rgba(255,255,255,0.7); font-weight: 600; }
 
-        /* ── Status pill ── */
         .status-pill {
             display: inline-flex;
             align-items: center;
@@ -139,7 +123,6 @@
         }
         @keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
 
-        /* ── Hero card ── */
         .hero-card {
             width: 100%;
             max-width: 780px;
@@ -157,22 +140,17 @@
             animation: fadeUp 1s ease both 0.2s;
         }
 
-        /* sheen sweep */
         .hero-card::before {
             content: '';
             position: absolute;
             top: 0; left: -200%;
             width: 60%; height: 100%;
-            background: linear-gradient(to right,
-                transparent,
-                rgba(255,255,255,0.04),
-                transparent);
+            background: linear-gradient(to right, transparent, rgba(255,255,255,0.04), transparent);
             transform: skewX(-20deg);
             animation: sheen 8s ease infinite 2s;
         }
         @keyframes sheen { 0%{left:-200%} 25%{left:200%} 100%{left:200%} }
 
-        /* ── Typography ── */
         .eyebrow {
             font-family: 'Space Grotesk', sans-serif;
             font-size: 0.72rem;
@@ -212,7 +190,6 @@
         }
         .hero-sub strong { color: rgba(255,255,255,0.75); font-weight: 600; }
 
-        /* ── Stats row ── */
         .stats-row {
             display: flex;
             justify-content: center;
@@ -245,7 +222,6 @@
             margin-top: 2px;
         }
 
-        /* ── CTA button ── */
         .cta-wrap {
             display: flex;
             align-items: center;
@@ -254,22 +230,24 @@
             animation: fadeUp 1s ease both 0.7s;
         }
 
+        /* FIX 4: Changed <a href="/dashboard"> to a proper button with JS navigation */
         .launch-btn {
             display: inline-flex;
             align-items: center;
             gap: 12px;
             padding: 16px 40px;
             border-radius: 50px;
-            text-decoration: none;
             color: #fff;
             font-size: 1rem;
             font-weight: 700;
+            font-family: 'Outfit', sans-serif;
             letter-spacing: 0.3px;
             position: relative;
             transition: transform 0.3s ease, box-shadow 0.3s ease;
             background: linear-gradient(135deg, var(--pink) 0%, var(--purple) 100%);
             box-shadow: 0 8px 32px rgba(155,81,224,0.35);
             border: none;
+            cursor: pointer;
         }
         .launch-btn::after {
             content: '';
@@ -291,27 +269,6 @@
         .launch-btn:hover .arrow { transform: translateX(4px); }
         .arrow { transition: transform 0.3s; }
 
-        .ghost-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 16px 28px;
-            border-radius: 50px;
-            text-decoration: none;
-            color: rgba(255,255,255,0.55);
-            font-size: 0.9rem;
-            font-weight: 500;
-            border: 1px solid rgba(255,255,255,0.1);
-            transition: all 0.3s;
-            background: transparent;
-        }
-        .ghost-btn:hover {
-            color: #fff;
-            border-color: rgba(255,255,255,0.25);
-            background: rgba(255,255,255,0.05);
-        }
-
-        /* ── Animations ── */
         @keyframes fadeUp {
             from { opacity: 0; transform: translateY(24px); }
             to   { opacity: 1; transform: translateY(0); }
@@ -321,7 +278,6 @@
             to   { opacity: 1; transform: translateY(0); }
         }
 
-        /* ── Mobile ── */
         @media (max-width: 640px) {
             .hero-card { padding: 40px 24px 36px; }
             .hero-title { font-size: 2.5rem; }
@@ -331,46 +287,36 @@
             .stat-item:last-child { border-bottom: none; }
             .topbar { padding: 16px 20px; }
             .cta-wrap { flex-direction: column; }
-            .launch-btn, .ghost-btn { width: 100%; justify-content: center; }
+            .launch-btn { width: 100%; justify-content: center; }
         }
     </style>
 </head>
 <body>
 
-    <!-- Background -->
     <div class="bg"></div>
     <div class="orb orb-1"></div>
     <div class="orb orb-2"></div>
     <div class="orb orb-3"></div>
 
-    <!-- Top bar -->
     <nav class="topbar">
         <div class="topbar-brand">
             <i class="fa-solid fa-fire-flame-curved"></i>
             FireShield AI
         </div>
-        <div class="topbar-right">
-            Powered by <span>&nbsp;Razors</span>
-        </div>
     </nav>
 
-    <!-- Main stage -->
     <div class="stage">
-
         <div class="status-pill">
             <span class="status-dot"></span>
             All Systems Operational
         </div>
 
         <div class="hero-card">
-
             <p class="eyebrow">Forest Fire Intelligence Platform</p>
-
             <h1 class="hero-title">
                 Predict fires.<br>
                 <span class="fire-word">Protect lives.</span>
             </h1>
-
             <p class="hero-sub">
                 FireShield AI combines <strong>live satellite weather data</strong>,
                 geospatial terrain analysis, and a trained
@@ -378,7 +324,6 @@
                 wildfire risk for any location on Earth — in seconds.
             </p>
 
-            <!-- Stats -->
             <div class="stats-row">
                 <div class="stat-item">
                     <div class="stat-num">11</div>
@@ -398,15 +343,12 @@
                 </div>
             </div>
 
-            <!-- CTAs -->
             <div class="cta-wrap">
-                <a href="/dashboard" class="launch-btn">
+                <button class="launch-btn" onclick="window.location.href='/dashboard'">
                     Launch Platform
                     <i class="fa-solid fa-arrow-right arrow"></i>
-                </a>
-              
+                </button>
             </div>
-
         </div>
     </div>
 
