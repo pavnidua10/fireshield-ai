@@ -271,18 +271,20 @@ body {
 /* Mobile */
 @media (max-width: 768px) {
   #sidebar {
-    transform: translateX(-100%);
-    transition: 0.3s;
+    position: fixed;   /* stays out of document flow */
+    top: 0; left: 0;
+    width: 250px;
+    height: 100vh;
+    transform: translateX(-100%);  /* hidden off-screen */
+    transition: transform 0.3s;
+    z-index: 200;
   }
-
-  #sidebar.active {
-    transform: translateX(0);
-  }
-
   #content {
-    margin-left: 0;
-    width: 100%;
+    margin-left: 0 !important;
+    width: 100% !important;
+    padding: 16px;
   }
+
 }
 @media(max-width:768px){#sidebar{position:relative;width:100%;height:auto}#content{margin-left:0;padding:10px}.hero-section{flex-direction:column;gap:12px}}
 .pulse-fire{animation:pulse 1s infinite;}@keyframes pulse{0%{opacity:.4}50%{opacity:1}100%{opacity:.4}}

@@ -164,7 +164,7 @@
             border-bottom: 1px solid rgba(255,255,255,0.06);
             margin-bottom: 12px;
         }
-
+        
         /* ── Scan button pulse ── */
         .scanning .fa-satellite-dish { animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
@@ -178,9 +178,82 @@
             margin-right: 5px;
             animation: pulse 1.4s infinite;
         }
+
+        /* ── Cold Start Banner ── */
+        #cold-start-banner {
+            display: none;
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9999;
+            background: #1a1f2e;
+            border: 1px solid rgba(55, 138, 221, 0.35);
+            border-left: 4px solid #378ADD;
+            border-radius: 10px;
+            padding: 14px 20px;
+            min-width: 320px;
+            max-width: 420px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.45);
+            animation: bannerSlideUp 0.35s cubic-bezier(.4,0,.2,1);
+        }
+        @keyframes bannerSlideUp {
+            from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+            to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+        #cold-start-banner .banner-icon {
+            font-size: 18px;
+            color: #378ADD;
+            margin-right: 10px;
+            flex-shrink: 0;
+            animation: spinSlow 2s linear infinite;
+        }
+        @keyframes spinSlow { to { transform: rotate(360deg); } }
+        #cold-start-banner .banner-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #e6edf3;
+            margin-bottom: 3px;
+        }
+        #cold-start-banner .banner-sub {
+            font-size: 11.5px;
+            color: #8b949e;
+            line-height: 1.45;
+        }
+        #cold-start-banner .banner-progress {
+            margin-top: 10px;
+            height: 3px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        #cold-start-banner .banner-progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #378ADD, #2ea043);
+            border-radius: 10px;
+            animation: progressFill 35s linear forwards;
+        }
+        @keyframes progressFill {
+            to { width: 90%; }
+        }
     </style>
 </head>
 <body>
+
+    <!-- ── Cold Start Banner ── -->
+    <div id="cold-start-banner">
+        <div class="d-flex align-items-start">
+            <i class="fa-solid fa-satellite-dish banner-icon mt-1"></i>
+            <div>
+                <div class="banner-title">Cold start in progress</div>
+                <div class="banner-sub">The server dozed off. Satellite pipeline spinning up — usually 20–40 seconds.</div>
+            </div>
+        </div>
+        <div class="banner-progress">
+            <div class="banner-progress-fill" id="banner-progress-fill"></div>
+        </div>
+    </div>
 
     <!-- Sidebar -->
     <nav id="sidebar">
@@ -484,6 +557,30 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <script>
+    // ── Cold Start Banner helpers ──────────────────────────────────
+    let coldStartTimer = null;
+
+    function showColdStartBanner() {
+        const banner = document.getElementById('cold-start-banner');
+        const fill = document.getElementById('banner-progress-fill');
+        // Reset and show
+        fill.style.animation = 'none';
+        fill.offsetHeight; // reflow to restart animation
+        fill.style.animation = 'progressFill 35s linear forwards';
+        banner.style.display = 'block';
+    }
+
+    function hideColdStartBanner() {
+        const banner = document.getElementById('cold-start-banner');
+        banner.style.opacity = '0';
+        banner.style.transition = 'opacity 0.4s ease';
+        setTimeout(() => {
+            banner.style.display = 'none';
+            banner.style.opacity = '1';
+            banner.style.transition = '';
+        }, 400);
+    }
+
     // ── Gauge helpers ──────────────────────────────────────────────
     const GAUGE_TOTAL = 251.2; // arc length of the semicircle
 
@@ -662,6 +759,10 @@
         btn.classList.add('scanning');
         btn.disabled = true;
 
+        // Show cold-start banner after 4 seconds if request is still pending
+        // (fast responses skip it entirely)
+        coldStartTimer = setTimeout(showColdStartBanner, 4000);
+
         const payload = city ? { city } : { lat, lon };
 
         fetch('/api/analyze', {
@@ -677,6 +778,8 @@
         })
         .catch(err => alert('Request failed: ' + err))
         .finally(() => {
+            clearTimeout(coldStartTimer);
+            hideColdStartBanner();
             btn.classList.remove('scanning');
             btn.disabled = false;
         });
